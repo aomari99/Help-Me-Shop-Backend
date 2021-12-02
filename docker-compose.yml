@@ -1,0 +1,69 @@
+version: '3.7'
+
+services:
+  web:
+    build: .
+    container_name: test_deploy_web
+    command: >
+      sh -c "./wait.sh db:5432 -- python manage.py collectstatic --noinput
+      && python manage.py makemigrations admin auth contenttypes pages sessions 
+      && python manage.py migrate
+      && python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - ./DJangoAPI:/DJangoAPI/
+      - staticfiles:/DJangoAPI/config/config/
+    expose:
+      - 8000
+    env_file:
+      - ./.env
+    depends_on:
+      - db
+    links:
+      - db:db
+    networks:
+      moco:
+  db:
+    image: kartoza/postgis
+    container_name: test_deploy_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - "POSTGRES_HOST_AUTH_METHOD=trust"
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    networks:
+      moco:
+  pgadmin:
+    build: ./pgadmin 
+    depends_on:
+      - db
+    ports:
+      - "5555:5050"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: pass
+      PGADMIN_DEFAULT_PASSWORD: Password
+    restart: unless-stopped
+    networks:
+      moco:
+  nginx:
+    build: ./nginx
+    container_name: test_deploy_nginx
+    volumes:
+      - /home/ubuntu/DockerDjango/DJangoAPI/config/static/:/usr/share/nginx/html/static/
+      - /home/ubuntu/DockerDjango/DJangoAPI/config/static/media/:/usr/share/nginx/html/media/
+    ports:
+      - 80:80
+      - 443:443
+    environment:
+      CERTBOT_EMAIL: mocoworkshop2020@gmail.com
+    depends_on:
+      - web
+    
+    networks:
+      moco:
+networks:
+   moco:
+volumes:
+  postgres_data:
+  staticfiles:
